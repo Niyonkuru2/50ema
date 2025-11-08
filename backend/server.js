@@ -11,7 +11,8 @@ app.listen(PORT, () => {
 });
 
 // Run automatic analysis every 15 minutes
-cron.schedule("*/10 * * * *", async () => {
+cron.schedule("0 */3 * * *", async () => {
   console.log("Running scheduled market analysis...");
   await autoAnalyzeMarket();
 });
+
