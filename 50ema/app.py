@@ -38,11 +38,11 @@ def analyze(data: MarketData):
     # --- Improved Trading Logic ---
     # Detect SELL: price was in uptrend but just crossed below SMA
     if before_prev['uptrend'] and prev['uptrend'] and latest['downtrend']:
-        signal = "SELL"
+        signal = "BUY"
 
     # Detect BUY: price was in downtrend but just crossed above SMA
     elif before_prev['downtrend'] and prev['downtrend'] and latest['uptrend']:
-        signal = "BUY"
+        signal = "SELL"
 
     else:
         signal = "NEUTRAL"
