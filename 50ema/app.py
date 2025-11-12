@@ -1,63 +1,63 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pandas as pd
-from ta.trend import SMAIndicator
+from ta.trend import EMAIndicator
 
 app = FastAPI(title="Market Signal API")
 
 class MarketData(BaseModel):
-    values: list  # Expected: list of dicts with at least 'close'
+    values: list  # expects list of dicts with at least 'close'
     symbol: str
     timeframe: str
 
 @app.post("/analyze")
 def analyze(data: MarketData):
-    # Convert input data into DataFrame
-    df = pd.DataFrame(data.values)
+    # Convert input to DataFrame
+    raw_data = data.values
+    df = pd.DataFrame(raw_data)
     
-    if 'close' not in df.columns:
-        return {"error": "Missing 'close' column in input data"}
-
+    # Ensure correct type and order
     df['close'] = df['close'].astype(float)
+    df = df.iloc[::-1].reset_index(drop=True)  # oldest first, newest last
 
-    # Ensure data is chronological (oldest first)
-    df = df.iloc[::-1].reset_index(drop=True)
+    # Calculate 50 EMA
+    df['ema50'] = EMAIndicator(df['close'], window=50).ema_indicator()
 
-    # Compute 50-period SMA
-    df['sma50'] = SMAIndicator(df['close'], window=50).sma_indicator()
-
-    # Define trend direction
-    df['uptrend'] = df['close'] > df['sma50']
-    df['downtrend'] = df['close'] < df['sma50']
-
-    # Get last 3 data points for better detection stability
+    # Get last close and EMA
     latest = df.iloc[-1]
-    prev = df.iloc[-2]
-    before_prev = df.iloc[-3]
+    last_close = latest['close']
+    ema50 = latest['ema50']
 
-    # --- Improved Trading Logic ---
-    # Detect SELL: price was in uptrend but just crossed below SMA
-    if before_prev['uptrend'] and prev['uptrend'] and latest['downtrend']:
-        signal = "BUY"
-
-    # Detect BUY: price was in downtrend but just crossed above SMA
-    elif before_prev['downtrend'] and prev['downtrend'] and latest['uptrend']:
-        signal = "SELL"
-
+    # Determine position
+    if last_close > ema50:
+        signal = "ABOVE_EMA"
+    elif last_close < ema50:
+        signal = "BELOW_EMA"
     else:
-        signal = "NEUTRAL"
+        signal = "ON_EMA"
 
-    # --- Result Output ---
+    # Optional: detect a crossover (for BUY/SELL)
+    prev = df.iloc[-2]
+    if prev['close'] <= prev['ema50'] and last_close > ema50:
+        crossover = "BUY"
+    elif prev['close'] >= prev['ema50'] and last_close < ema50:
+        crossover = "SELL"
+    else:
+        crossover = "NONE"
+
+    # Response
     result = {
         "symbol": data.symbol,
         "timeframe": data.timeframe,
-        "signal": signal,
-        "last_close": round(latest['close'], 4),
-        "sma50": round(latest['sma50'], 4),
-        "timestamp_index": int(df.index[-1])
+        "signal": signal, 
+        "crossover": crossover,
+        "last_close": last_close,
+        "ema50": ema50,
+        "timestamp": str(df.index[-1])
     }
 
     return result
+
 @app.get("/")
 def home():
     return {"message": "Market Signal API v2 is running successfully"}
