@@ -18,8 +18,10 @@ export const performAnalysis = async (symbol, timeframe) => {
       const emailHTML = marketSignalEmailTemplate(
         result.symbol,
         result.signal,
+        result.direction,
         result.timeframe,
-        result.last_close
+        result.last_close,
+        result.timestamp
       );
 
       await sendAlertEmail(`${result.symbol} Signal Alert`, emailHTML);
