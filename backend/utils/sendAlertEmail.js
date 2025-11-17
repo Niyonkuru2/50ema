@@ -18,64 +18,59 @@ export const marketSignalEmailTemplate = (
       padding: 0;
       font-family: 'Segoe UI', Arial, sans-serif;
       background-color: #f4f4f7;
-      color: #111827;
     }
     .container {
-      max-width: 600px;
+      max-width: 640px;
       margin: 40px auto;
       background: #ffffff;
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.1);
     }
     .header {
-      background-color: #1a73e8;
+      background: ${signal === "BUY" ? "#28a745" : "#dc3545"};
       color: #ffffff;
       text-align: center;
-      padding: 20px;
-      font-size: 24px;
-      font-weight: bold;
+      padding: 25px 20px;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 1px;
     }
     .content {
-      padding: 30px;
+      padding: 30px 40px;
+      color: #111827;
       font-size: 16px;
       line-height: 1.6;
     }
-    .signal {
-      display: inline-block;
-      padding: 10px 20px;
+    .highlight {
+      background-color: #f3f4f6;
       border-radius: 8px;
+      padding: 15px 20px;
+      margin-top: 15px;
+      font-size: 15px;
+    }
+    .signal-tag {
+      display: inline-block;
+      padding: 8px 18px;
+      border-radius: 6px;
       color: #ffffff;
       font-weight: bold;
+      background-color: ${signal === "BUY" ? "#28a745" : "#dc3545"};
       text-transform: uppercase;
     }
-    .buy { background-color: #28a745; }
-    .sell { background-color: #dc3545; }
-    .neutral { background-color: #6c757d; }
-    .direction {
-      display: inline-block;
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      text-transform: uppercase;
-      color: #fff;
-    }
-    .up { background-color: #16a34a; }
-    .down { background-color: #dc2626; }
-    .neutral-dir { background-color: #6b7280; }
-    .data-table {
+    .table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
     }
-    .data-table th, .data-table td {
+    .table th, .table td {
       text-align: left;
-      padding: 10px;
-      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 0;
     }
-    .data-table th {
-      background-color: #f9fafb;
-      font-weight: bold;
+    .table th {
+      color: #6b7280;
+      font-weight: 600;
+      width: 40%;
     }
     .footer {
       text-align: center;
@@ -83,41 +78,35 @@ export const marketSignalEmailTemplate = (
       color: #6b7280;
       padding: 20px;
       background-color: #f9fafb;
+      border-top: 1px solid #e5e7eb;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">Market Signal Alert</div>
+    <div class="header">${signal} SIGNAL ALERT</div>
     <div class="content">
-      <p>Hello Trader,</p>
-      <p>Our algorithm has detected a new market signal:</p>
-
-      <p><strong>Symbol:</strong> ${symbol}</p>
-      <p><strong>Timeframe:</strong> ${timeframe}</p>
-
-      <p><strong>Signal:</strong> 
-        <span class="signal ${signal === "BUY" ? "buy" : signal === "SELL" ? "sell" : "neutral"}">
-          ${signal}
-        </span>
+      <p>Dear Trader,</p>
+      <p>
+        A new <strong>${signal}</strong> signal has been detected by your automated EMA-50 system.
+        Here are the details:
       </p>
-
-      <p><strong>Direction:</strong>
-        <span class="direction ${direction === "UP" ? "up" : direction === "DOWN" ? "down" : "neutral-dir"}">
-          ${direction}
-        </span>
+      
+      <div class="highlight">
+        <p><strong>Symbol:</strong> ${symbol}</p>
+        <p><strong>Timeframe:</strong> ${timeframe}</p>
+        <p><strong>Trend Direction:</strong> ${direction}</p>
+        <p><strong>Signal:</strong> <span class="signal-tag">${signal}</span></p>
+        <p><strong>Last Close Price:</strong> ${lastClose}</p>
+      </div>
+      <p>
+        Always confirm the signal with your trading strategy and risk management rules before entering a trade.
       </p>
-
-      <table class="data-table">
-        <tr><th>Last Close</th><td>${lastClose ?? "—"}</td></tr>
-  
-        <tr><th>Timestamp</th><td>${timestamp ?? new Date().toISOString()}</td></tr>
-      </table>
-
-      <p>Check your chart to confirm and manage the trade carefully.</p>
     </div>
+
     <div class="footer">
-      &copy; ${new Date().getFullYear()} Market Signal System. All rights reserved.
+      &copy; ${new Date().getFullYear()} Market Signal Bot. All rights reserved.<br/>
+      Powered by FastAPI × Node.js × Twelve Data.
     </div>
   </div>
 </body>
