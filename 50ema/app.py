@@ -49,7 +49,10 @@ def analyze(data: MarketData):
         return {"error": "Not enough data"}
 
     df = df.iloc[::-1].reset_index(drop=True)
-    df['close'] = df['close'].astype(float)
+
+    # ✅ Convert all OHLC to float to fix comparison errors
+    for col in ['open', 'high', 'low', 'close']:
+        df[col] = df[col].astype(float)
 
     # EMA50
     df['ema50'] = EMAIndicator(df['close'], window=50).ema_indicator()
@@ -97,4 +100,4 @@ def analyze(data: MarketData):
 
 @app.get("/")
 def home():
-    return {"message": "EMA Crossover Detector v3 running successfully"}
+    return {"message": "Pullback Structure Strategy API running successfully"}
