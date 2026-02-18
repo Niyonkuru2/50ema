@@ -3,82 +3,97 @@ from pydantic import BaseModel
 import pandas as pd
 from ta.trend import EMAIndicator
 
-app = FastAPI(title="Professional EMA Crossover API")
+app = FastAPI(title="Pullback Structure Strategy API")
 
 class MarketData(BaseModel):
-    values: list  # list of dicts with at least 'close'
+    values: list  # must include open, high, low, close
     symbol: str
     timeframe: str
 
 
+def detect_structure(df):
+    highs = []
+    lows = []
+
+    # Detect swing highs & lows
+    for i in range(2, len(df) - 2):
+        if df['high'][i] > df['high'][i-1] and df['high'][i] > df['high'][i-2] \
+           and df['high'][i] > df['high'][i+1] and df['high'][i] > df['high'][i+2]:
+            highs.append(df['high'][i])
+
+        if df['low'][i] < df['low'][i-1] and df['low'][i] < df['low'][i-2] \
+           and df['low'][i] < df['low'][i+1] and df['low'][i] < df['low'][i+2]:
+            lows.append(df['low'][i])
+
+    if len(highs) < 2 or len(lows) < 2:
+        return "NO_STRUCTURE"
+
+    # Last two swings
+    if highs[-1] > highs[-2] and lows[-1] > lows[-2]:
+        return "UPTREND"
+
+    elif highs[-1] < highs[-2] and lows[-1] < lows[-2]:
+        return "DOWNTREND"
+
+    return "RANGE"
+
+
 @app.post("/analyze")
 def analyze(data: MarketData):
-    raw_data = data.values
-    df = pd.DataFrame(raw_data)
+    df = pd.DataFrame(data.values)
 
-    # --- VALIDATION ---
-    if 'close' not in df.columns:
-        return {"error": "Missing 'close' field in input data"}
-    if len(df) < 51:
-        return {"error": "Not enough data for 50 EMA calculation"}
+    if not all(col in df.columns for col in ['open', 'high', 'low', 'close']):
+        return {"error": "Missing OHLC data"}
 
-    # --- PREP DATA ---
+    if len(df) < 60:
+        return {"error": "Not enough data"}
+
+    df = df.iloc[::-1].reset_index(drop=True)
     df['close'] = df['close'].astype(float)
-    df = df.iloc[::-1].reset_index(drop=True)  # oldest → newest
 
-    # --- CALCULATE EMA50 ---
+    # EMA50
     df['ema50'] = EMAIndicator(df['close'], window=50).ema_indicator()
 
-    # --- DEFINE LAST TWO CANDLES ---
-    prev = df.iloc[-2]
+    structure = detect_structure(df)
+
     latest = df.iloc[-1]
+    prev = df.iloc[-2]
 
-    prev_close, prev_ema = prev['close'], prev['ema50']
-    last_close, last_ema = latest['close'], latest['ema50']
+    signal = "NO_TRADE"
+    stop_loss = None
+    take_profit = None
 
-    # --- CROSSOVER DETECTION ---
-    signal = None
-    direction = None
-    crossover = None
+    # BUY CONDITIONS
+    if structure == "UPTREND":
+        if latest['close'] > latest['ema50']:
+            # Pullback = previous candle closed near EMA
+            if abs(prev['close'] - prev['ema50']) < 0.001:
+                # Bullish confirmation candle
+                if latest['close'] > latest['open']:
+                    signal = "BUY"
+                    stop_loss = df['low'].iloc[-5:-1].min()
+                    risk = latest['close'] - stop_loss
+                    take_profit = latest['close'] + (risk * 2)
 
-    # BUY signal → crosses ABOVE EMA after being below
-    if prev_close < prev_ema and last_close > last_ema:
-        crossover = "BUY"
-        direction = "UP"
-        signal = "PRICE_CROSSED_ABOVE_EMA"
+    # SELL CONDITIONS
+    if structure == "DOWNTREND":
+        if latest['close'] < latest['ema50']:
+            if abs(prev['close'] - prev['ema50']) < 0.001:
+                if latest['close'] < latest['open']:
+                    signal = "SELL"
+                    stop_loss = df['high'].iloc[-5:-1].max()
+                    risk = stop_loss - latest['close']
+                    take_profit = latest['close'] - (risk * 2)
 
-    # SELL signal → crosses BELOW EMA after being above
-    elif prev_close > prev_ema and last_close < last_ema:
-        crossover = "SELL"
-        direction = "DOWN"
-        signal = "PRICE_CROSSED_BELOW_EMA"
-
-    # No crossover, just relative position
-    else:
-        if last_close > last_ema:
-            direction = "UPTREND"
-            signal = "PRICE_ABOVE_EMA"
-        elif last_close < last_ema:
-            direction = "DOWNTREND"
-            signal = "PRICE_BELOW_EMA"
-        else:
-            direction = "NEUTRAL"
-            signal = "ON_EMA"
-
-    # --- RESPONSE ---
-    result = {
+    return {
         "symbol": data.symbol,
         "timeframe": data.timeframe,
+        "structure": structure,
         "signal": signal,
-        "crossover": crossover if crossover else "NONE",
-        "direction": direction,
-        "last_close": round(last_close, 5),
-        "ema50": round(last_ema, 5),
-        "index": int(df.index[-1]),
+        "entry": round(latest['close'], 5),
+        "stop_loss": round(stop_loss, 5) if stop_loss else None,
+        "take_profit": round(take_profit, 5) if take_profit else None
     }
-
-    return result
-
 
 @app.get("/")
 def home():
