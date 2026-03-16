@@ -52,7 +52,7 @@ export const performAnalysis = async (symbol, timeframe) => {
 
 // Run analysis via FastAPI API
 const runPythonAnalysis = async (marketData, symbol, timeframe) => {
-   //const url = "https://five0ema-1-7wri.onrender.com/analyze";
+   const url = "https://five0ema-1-7wri.onrender.com/analyze";
   //const url = "https://suing-s27n.onrender.com/analyze";
   const payload = { values: marketData, symbol, timeframe };
 
@@ -69,14 +69,15 @@ const runPythonAnalysis = async (marketData, symbol, timeframe) => {
 export const autoAnalyzeMarket = async () => {
  
   const pairs = [
-    //{ symbol: "EUR/USD", timeframe: "5min" },
-    //{ symbol: "GBP/USD", timeframe: "5min" },
-    //{ symbol: "USD/JPY", timeframe: "5min" },
-    { symbol: "USD/CAD", timeframe: "5min" },
-    { symbol: "USD/CHF", timeframe: "5min" },
-    { symbol: "NZD/USD", timeframe: "5min" },
-    //{ symbol: "GBP/JPY", timeframe: "5min" },
-    //{ symbol: "EUR/GBP", timeframe: "5min" },
+   { symbol: "EUR/USD", timeframe: "30min" },
+    { symbol: "EUR/GBP", timeframe: "30min" },
+    { symbol: "GBP/USD", timeframe: "30min" },
+    //{ symbol: "GBP/JPY", timeframe: "30min" },
+    { symbol: "USD/JPY", timeframe: "30min" },
+    { symbol: "USD/CAD", timeframe: "30min" },
+    { symbol: "USD/CHF", timeframe: "30min" },
+    { symbol: "NZD/USD", timeframe: "30min" },
+    { symbol: "AUD/USD", timeframe: "30min" },
   ];
 
   for (const pair of pairs) {
