@@ -3,36 +3,32 @@ from pydantic import BaseModel
 import pandas as pd
 from ta.trend import EMAIndicator
 
-app = FastAPI(title="Pullback Structure Strategy API")
+app = FastAPI(title="Market Structure + EMA50 Strategy API")
+
 
 class MarketData(BaseModel):
-    values: list  # must include open, high, low, close
+    values: list
     symbol: str
     timeframe: str
 
 
 def detect_structure(df):
-    highs = []
-    lows = []
+    """
+    Detects HH/HL (uptrend) or LH/LL (downtrend)
+    """
+    highs = df['high']
+    lows = df['low']
 
-    # Detect swing highs & lows
-    for i in range(2, len(df) - 2):
-        if df['high'][i] > df['high'][i-1] and df['high'][i] > df['high'][i-2] \
-           and df['high'][i] > df['high'][i+1] and df['high'][i] > df['high'][i+2]:
-            highs.append(df['high'][i])
+    # Last 3 swings
+    h1, h2, h3 = highs.iloc[-3], highs.iloc[-2], highs.iloc[-1]
+    l1, l2, l3 = lows.iloc[-3], lows.iloc[-2], lows.iloc[-1]
 
-        if df['low'][i] < df['low'][i-1] and df['low'][i] < df['low'][i-2] \
-           and df['low'][i] < df['low'][i+1] and df['low'][i] < df['low'][i+2]:
-            lows.append(df['low'][i])
-
-    if len(highs) < 2 or len(lows) < 2:
-        return "NO_STRUCTURE"
-
-    # Last two swings
-    if highs[-1] > highs[-2] and lows[-1] > lows[-2]:
+    # Higher Highs & Higher Lows
+    if h3 > h2 > h1 and l3 > l2 > l1:
         return "UPTREND"
 
-    elif highs[-1] < highs[-2] and lows[-1] < lows[-2]:
+    # Lower Highs & Lower Lows
+    if h3 < h2 < h1 and l3 < l2 < l1:
         return "DOWNTREND"
 
     return "RANGE"
@@ -40,6 +36,7 @@ def detect_structure(df):
 
 @app.post("/analyze")
 def analyze(data: MarketData):
+
     df = pd.DataFrame(data.values)
 
     if not all(col in df.columns for col in ['open', 'high', 'low', 'close']):
@@ -48,45 +45,54 @@ def analyze(data: MarketData):
     if len(df) < 60:
         return {"error": "Not enough data"}
 
+    # Latest candle at bottom
     df = df.iloc[::-1].reset_index(drop=True)
 
-    #  Convert all OHLC to float to fix comparison errors
+    # Convert to float
     for col in ['open', 'high', 'low', 'close']:
         df[col] = df[col].astype(float)
 
-    # EMA50
-    df['ema50'] = EMAIndicator(df['close'], window=50).ema_indicator()
-
-    structure = detect_structure(df)
+    # =========================
+    # EMA 50
+    # =========================
+    df['ema50'] = EMAIndicator(close=df['close'], window=50).ema_indicator()
 
     latest = df.iloc[-1]
-    prev = df.iloc[-2]
+
+    # =========================
+    # STRUCTURE DETECTION
+    # =========================
+    structure = detect_structure(df)
 
     signal = "NO_TRADE"
     stop_loss = None
     take_profit = None
 
+    # =========================
     # BUY CONDITIONS
-    if structure == "UPTREND":
-        if latest['close'] > latest['ema50']:
-            # Pullback = previous candle closed near EMA
-            if abs(prev['close'] - prev['ema50']) < 0.001:
-                # Bullish confirmation candle
-                if latest['close'] > latest['open']:
-                    signal = "BUY"
-                    stop_loss = df['low'].iloc[-5:-1].min()
-                    risk = latest['close'] - stop_loss
-                    take_profit = latest['close'] + (risk * 2)
+    # =========================
+    if (
+        latest['close'] > latest['ema50']
+        and structure == "UPTREND"
+    ):
+        signal = "BUY_TREND"
 
+        stop_loss = df['low'].iloc[-6:-1].min()
+        risk = latest['close'] - stop_loss
+        take_profit = latest['close'] + (risk * 2)
+
+    # =========================
     # SELL CONDITIONS
-    if structure == "DOWNTREND":
-        if latest['close'] < latest['ema50']:
-            if abs(prev['close'] - prev['ema50']) < 0.001:
-                if latest['close'] < latest['open']:
-                    signal = "SELL"
-                    stop_loss = df['high'].iloc[-5:-1].max()
-                    risk = stop_loss - latest['close']
-                    take_profit = latest['close'] - (risk * 2)
+    # =========================
+    elif (
+        latest['close'] < latest['ema50']
+        and structure == "DOWNTREND"
+    ):
+        signal = "SELL_TREND"
+
+        stop_loss = df['high'].iloc[-6:-1].max()
+        risk = stop_loss - latest['close']
+        take_profit = latest['close'] - (risk * 2)
 
     return {
         "symbol": data.symbol,
@@ -94,10 +100,12 @@ def analyze(data: MarketData):
         "structure": structure,
         "signal": signal,
         "entry": round(latest['close'], 5),
+        "ema50": round(latest['ema50'], 5),
         "stop_loss": round(stop_loss, 5) if stop_loss else None,
         "take_profit": round(take_profit, 5) if take_profit else None
     }
 
+
 @app.get("/")
 def home():
-    return {"message": "Pullback Structure Strategy API running successfully"}
+    return {"message": "Market Structure + EMA50 API running successfully"}
